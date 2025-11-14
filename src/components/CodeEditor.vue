@@ -1,26 +1,31 @@
 <script setup lang="ts">
 import { EXAMPLES } from '@/assets/examples'
 import type { Issue } from '@/types'
-import { computed, ref, useTemplateRef } from 'vue'
-import { Codemirror } from 'vue-codemirror'
 import { angular } from '@codemirror/lang-angular'
-import { vue } from '@codemirror/lang-vue'
 import { javascript } from '@codemirror/lang-javascript'
-
-// frameworks, selectFramework, selectedFramework, analyzeComponent, isAnalyzing, fixedCode, copyFixedCode, copied, issues, getSeverityClass, getSeverityIcon,categories
+import { vue } from '@codemirror/lang-vue'
+import type { Extension } from '@codemirror/state'
+import { computed, reactive, ref } from 'vue'
+import { Codemirror } from 'vue-codemirror'
 const selectedFramework = ref('vue')
 const code = ref(EXAMPLES.vue)
-const issues: Array<Issue> = ref([])
+const issues = ref<Array<Issue>>([])
 const isAnalyzing = ref(false)
 const fixedCode = ref('')
 const copied = ref(false)
-// const editorElement = useTemplateRef('editorElement')
 
-const frameworks = [
-  { id: 'vue', name: 'Vue', icon: '💚', mode: 'vue' },
-  { id: 'react', name: 'React', icon: '⚛️', mode: 'jsx' },
-  { id: 'angular', name: 'Angular', icon: '🅰️', mode: 'javascript' },
-]
+// sets up a map of the possible languages for codemirror, with a string we can use to swap between them and the imported functionality we can call
+const languageMap = reactive(
+  new Map<string, { name: string; icon: string; mode: string; langFunc: () => unknown }>([
+    ['vue', { name: 'Vue', icon: '💚', mode: 'vue', langFunc: vue }],
+    ['react', { name: 'React', icon: '⚛️', mode: 'jsx', langFunc: javascript }],
+    ['angular', { name: 'Angular', icon: '🅰️', mode: 'angular', langFunc: angular }],
+  ]),
+)
+const extensions = computed<Extension[]>(() => {
+  const framework = languageMap.get(selectedFramework.value)
+  return framework ? [framework.langFunc() as Extension] : []
+})
 
 const categories = {
   semantic: { label: 'Semantic HTML', icon: '🏗️' },
@@ -29,22 +34,11 @@ const categories = {
   screenReader: { label: 'Screen Reader', icon: '👂' },
 }
 
-const extensions = computed(() => {
-  const result = []
-  const framework = frameworks.find((f) => f.id === selectedFramework.value)
-  // const langCodeMap = reactive(new Map<string, { code: string; language: () => any }>())
-  // need to understand above line so i can grab the string of the lang and make it a callable function like vue(), since that's what needs to be pushed to result
-  result.push(framework!.mode)
-
-  return result
-})
-
 function selectFramework(frameworkId: string) {
   selectedFramework.value = frameworkId
-  code.value = EXAMPLES[frameworkId]
+  code.value = EXAMPLES[frameworkId as keyof typeof EXAMPLES]
   issues.value = []
   fixedCode.value = ''
-  // initEditor()
 }
 
 function copyFixedCode() {
@@ -149,10 +143,6 @@ async function analyzeComponent() {
   //             this.isAnalyzing = false;
   //           }
 }
-
-// onMounted(() => {
-//   initEditor()
-// })
 </script>
 
 <template>
@@ -164,17 +154,17 @@ async function analyzeComponent() {
         <label class="block text-sm font-medium text-gray-700 mb-3"> Select Framework </label>
         <div class="flex gap-2">
           <button
-            v-for="fw in frameworks"
-            :key="fw.id"
-            @click="selectFramework(fw.id)"
+            v-for="fw in Array.from(languageMap.keys())"
+            :key="fw"
+            @click="selectFramework(fw)"
             :class="[
               'flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors',
-              selectedFramework === fw.id
+              selectedFramework === fw
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
             ]"
           >
-            {{ fw.icon }} {{ fw.name }}
+            {{ languageMap.get(fw)?.icon }} {{ languageMap.get(fw)?.name }}
           </button>
         </div>
       </div>
@@ -182,7 +172,7 @@ async function analyzeComponent() {
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div class="p-3 bg-gray-800 flex justify-between items-center">
           <span class="text-white text-sm font-medium">
-            {{ frameworks.find((f) => f.id === selectedFramework)?.name }} Component
+            {{ languageMap.get(selectedFramework)?.name }} Component
           </span>
           <button
             @click="analyzeComponent"
