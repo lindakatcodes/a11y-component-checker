@@ -5,6 +5,7 @@ import { angular } from '@codemirror/lang-angular'
 import { javascript } from '@codemirror/lang-javascript'
 import { vue } from '@codemirror/lang-vue'
 import type { Extension } from '@codemirror/state'
+import { GoogleGenAI } from '@google/genai'
 import { computed, reactive, ref } from 'vue'
 import { Codemirror } from 'vue-codemirror'
 const selectedFramework = ref('vue')
@@ -13,8 +14,14 @@ const issues = ref<Array<Issue>>([])
 const isAnalyzing = ref(false)
 const fixedCode = ref('')
 const copied = ref(false)
+const showApiInput = ref(false)
+const apiKey = ref('')
 
-// sets up a map of the possible languages for codemirror, with a string we can use to swap between them and the imported functionality we can call
+const ai = computed(() => {
+  return new GoogleGenAI({ apiKey: apiKey.value })
+})
+
+// sets up a map of the possible languages available, with a string for quick access, a name and icon for UI viewing, and a mode and langFunc for codemirror to use
 const languageMap = reactive(
   new Map<string, { name: string; icon: string; mode: string; langFunc: () => unknown }>([
     ['vue', { name: 'Vue', icon: '💚', mode: 'vue', langFunc: vue }],
@@ -22,6 +29,7 @@ const languageMap = reactive(
     ['angular', { name: 'Angular', icon: '🅰️', mode: 'angular', langFunc: angular }],
   ]),
 )
+
 const extensions = computed<Extension[]>(() => {
   const framework = languageMap.get(selectedFramework.value)
   return framework ? [framework.langFunc() as Extension] : []
@@ -72,80 +80,93 @@ function getSeverityClass(severity: string) {
 }
 
 async function analyzeComponent() {
-  //           if (!this.apiKey.trim()) {
-  //             this.showApiInput = true;
-  //             return;
-  //           }
-  //           this.isAnalyzing = true;
-  //           this.issues = [];
-  //           this.fixedCode = '';
-  //           const framework = this.frameworks.find(f => f.id === this.selectedFramework);
-  //           try {
-  //             const response = await fetch(
-  //               'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + this.apiKey,
-  //               {
-  //                 method: 'POST',
-  //                 headers: { 'Content-Type': 'application/json' },
-  //                 body: JSON.stringify({
-  //                   contents: [{
-  //                     parts: [{
-  //                       text: `You are an accessibility expert. Analyze this ${framework.name} component for accessibility issues in these categories:
-  // 1. Semantic HTML (use proper elements like button, nav, header, etc.)
-  // 2. Color Contrast (WCAG AA requires 4.5:1 for normal text, 3:1 for large text)
-  // 3. Keyboard Navigation (tab order, focus management, keyboard shortcuts)
-  // 4. Screen Reader (ARIA labels, roles, alt text, sr-only content)
-  // ${framework.name} component code:
-  // \`\`\`${this.selectedFramework}
-  // ${this.code}
-  // \`\`\`
-  // Respond with ONLY a JSON object (no markdown, no preamble) with this structure:
-  // {
-  //   "issues": [
-  //     {
-  //       "category": "semantic" | "contrast" | "keyboard" | "screenReader",
-  //       "severity": "critical" | "warning" | "suggestion",
-  //       "title": "Brief issue title",
-  //       "description": "Detailed explanation",
-  //       "lineNumber": 5,
-  //       "fix": "How to fix it"
-  //     }
-  //   ],
-  //   "fixedCode": "Complete corrected ${framework.name} component code"
-  // }`
-  //                     }]
-  //                   }]
-  //                 })
-  //               }
-  //             );
-  //             const data = await response.json();
-  //             if (data.error) {
-  //               throw new Error(data.error.message || 'API error');
-  //             }
-  //             const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-  //             if (!text) throw new Error('No response from API');
-  //             // Clean up JSON response
-  //             let jsonText = text.trim();
-  //             jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-  //             const result = JSON.parse(jsonText);
-  //             this.issues = result.issues || [];
-  //             this.fixedCode = result.fixedCode || '';
-  //           } catch (error) {
-  //             console.error('Analysis error:', error);
-  //             this.issues = [{
-  //               category: 'semantic',
-  //               severity: 'critical',
-  //               title: 'Analysis Error',
-  //               description: error.message || 'Failed to analyze component. Please check your API key and try again.',
-  //               lineNumber: 0,
-  //               fix: 'Verify your Gemini API key is correct'
-  //             }];
-  //           } finally {
-  //             this.isAnalyzing = false;
-  //           }
+  if (!apiKey.value.trim()) {
+    showApiInput.value = true
+    return
+  }
+  isAnalyzing.value = true
+  issues.value = []
+  fixedCode.value = ''
+
+  const framework = languageMap.get(selectedFramework.value)
+  try {
+    const response = await ai.value.models.generateContent({
+      model: 'gemini-2.5-flash-lite',
+      contents: `You are an accessibility expert. Analyze this ${framework?.name} component for accessibility issues in these categories:
+      1. Semantic HTML (use proper elements like button, nav, header, etc.)
+      2. Color Contrast (WCAG AA requires 4.5:1 for normal text, 3:1 for large text)
+      3. Keyboard Navigation (tab order, focus management, keyboard shortcuts)
+      4. Screen Reader (ARIA labels, roles, alt text, sr-only content)
+      ${framework?.name} component code:
+      \`\`\`${selectedFramework.value}
+      ${code.value}
+      \`\`\`
+      Respond with ONLY a JSON object (no markdown, no preamble) with this structure:
+      {
+        "issues": [
+          {
+            "category": "semantic" | "contrast" | "keyboard" | "screenReader",
+            "severity": "critical" | "warning" | "suggestion",
+            "title": "Brief issue title",
+            "description": "Detailed explanation",
+            "lineNumber": 5,
+            "fix": "How to fix it"
+          }
+        ],
+        "fixedCode": "Complete corrected ${framework?.name} component code"
+      }`,
+    })
+
+    // if (response.error) {
+    //   throw new Error(data.error.message || 'API error')
+    // }
+    const text = response.text
+    if (!text) throw new Error('No response from API')
+    // Clean up JSON response
+    let jsonText = text.trim()
+    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+    const result = JSON.parse(jsonText)
+    issues.value = result.issues || []
+    fixedCode.value = result.fixedCode || ''
+  } catch (error) {
+    console.error('Analysis error:', error)
+    issues.value = [
+      {
+        category: 'semantic',
+        severity: 'critical',
+        title: 'Analysis Error',
+        description:
+          error.message || 'Failed to analyze component. Please check your API key and try again.',
+        lineNumber: 0,
+        fix: 'Verify your Gemini API key is correct',
+      },
+    ]
+  } finally {
+    isAnalyzing.value = false
+  }
 }
 </script>
 
 <template>
+  <div v-if="showApiInput && !apiKey" class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+    <p class="text-sm text-gray-700 mb-2">
+      Get a free API key from
+      <a
+        href="https://aistudio.google.com/app/apikey"
+        target="_blank"
+        rel="noopener noreferrer"
+        class="text-blue-600 underline"
+      >
+        Google AI Studio
+      </a>
+    </p>
+    <input
+      type="password"
+      placeholder="Paste your Gemini API key"
+      class="w-full px-3 py-2 border border-gray-300 rounded-md"
+      v-model="apiKey"
+    />
+  </div>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Editor Section -->
     <div class="space-y-4">
@@ -203,9 +224,13 @@ async function analyzeComponent() {
             <span v-else>📋 Copy Code</span>
           </button>
         </div>
-        <pre
-          class="bg-gray-50 p-3 rounded-md overflow-x-auto text-sm"
-        ><code>{{ fixedCode }}</code></pre>
+        <codemirror
+          v-model="fixedCode"
+          ref="fixedEditorElement"
+          class="w-full h-96"
+          :extensions="extensions"
+          :tab-size="2"
+        />
       </div>
     </div>
 

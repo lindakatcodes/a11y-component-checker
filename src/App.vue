@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { useHead } from '@unhead/vue'
-import { ref } from 'vue'
 import CodeEditor from './components/CodeEditor.vue'
 
 useHead({
@@ -10,8 +9,6 @@ useHead({
   },
 })
 
-const showApiInput = ref(false)
-const apiKey = ref('')
 </script>
 
 <template>
@@ -21,26 +18,6 @@ const apiKey = ref('')
       Paste your component code below to check for common accessibility issues
     </p>
   </header>
-
-  <div v-if="showApiInput && !apiKey" class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-    <p class="text-sm text-gray-700 mb-2">
-      Get a free API key from
-      <a
-        href="https://aistudio.google.com/app/apikey"
-        target="_blank"
-        rel="noopener noreferrer"
-        class="text-blue-600 underline"
-      >
-        Google AI Studio
-      </a>
-    </p>
-    <input
-      type="password"
-      placeholder="Paste your Gemini API key"
-      class="w-full px-3 py-2 border border-gray-300 rounded-md"
-      v-model="apiKey"
-    />
-  </div>
 
   <CodeEditor />
 
