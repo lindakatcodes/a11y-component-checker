@@ -5,9 +5,10 @@ import { angular } from '@codemirror/lang-angular'
 import { javascript } from '@codemirror/lang-javascript'
 import { vue } from '@codemirror/lang-vue'
 import type { Extension } from '@codemirror/state'
-import { GoogleGenAI } from '@google/genai'
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, onMounted } from 'vue'
 import { Codemirror } from 'vue-codemirror'
+import axios from 'axios' // Added axios
+
 const selectedFramework = ref('vue')
 const code = ref(EXAMPLES.vue)
 const issues = ref<Array<Issue>>([])
@@ -15,11 +16,11 @@ const isAnalyzing = ref(false)
 const fixedCode = ref('')
 const copied = ref(false)
 const showApiInput = ref(false)
-const apiKey = ref('')
+const apiKeyInput = ref('') // New ref for user's API key input
+const sessionActive = ref(false)
+const errorMessage = ref<string | null>(null) // For displaying user-friendly errors
 
-const ai = computed(() => {
-  return new GoogleGenAI({ apiKey: apiKey.value })
-})
+const backendUrl = 'http://localhost:3001'
 
 // sets up a map of the possible languages available, with a string for quick access, a name and icon for UI viewing, and a mode and langFunc for codemirror to use
 const languageMap = reactive(
@@ -79,10 +80,58 @@ function getSeverityClass(severity: string) {
   }
 }
 
+async function checkSessionStatus() {
+  errorMessage.value = null;
+  try {
+    const response = await fetch(`${backendUrl}/api/check-session`, {
+      credentials: 'include',
+    });
+    // if this call succeeds, the session is active
+    if (response.status === 200) {
+      sessionActive.value = true;
+    }
+  } catch (error: unknown) {
+    sessionActive.value = false;
+    showApiInput.value = true;
+    errorMessage.value = "Could not verify session. Please enter your API key.";
+  }
+}
+
+onMounted(() => {
+  checkSessionStatus();
+});
+
+async function startSession() {
+  errorMessage.value = null;
+  isAnalyzing.value = true; // Use isAnalyzing to show loading state during session start
+  try {
+    await fetch(`${backendUrl}/api/store-key`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: apiKeyInput.value }),
+    });
+
+    sessionActive.value = true;
+    showApiInput.value = false;
+    apiKeyInput.value = '';
+    console.log('Session started successfully!');
+  } catch (error: unknown) {
+    console.error('Error starting session:', error);
+    errorMessage.value = error.response?.data?.error || 'Failed to start session. Please check your API key and network.';
+    sessionActive.value = false;
+    showApiInput.value = true;
+  } finally {
+    isAnalyzing.value = false;
+  }
+}
+
 async function analyzeComponent() {
-  if (!apiKey.value.trim()) {
-    showApiInput.value = true
-    return
+  errorMessage.value = null;
+  if (!sessionActive.value) {
+    showApiInput.value = true;
+    errorMessage.value = "Please start a session with your API key first.";
+    return;
   }
   isAnalyzing.value = true
   issues.value = []
@@ -90,65 +139,58 @@ async function analyzeComponent() {
 
   const framework = languageMap.get(selectedFramework.value)
   try {
-    const response = await ai.value.models.generateContent({
-      model: 'gemini-2.5-flash-lite',
-      contents: `You are an accessibility expert. Analyze this ${framework?.name} component for accessibility issues in these categories:
-      1. Semantic HTML (use proper elements like button, nav, header, etc.)
-      2. Color Contrast (WCAG AA requires 4.5:1 for normal text, 3:1 for large text)
-      3. Keyboard Navigation (tab order, focus management, keyboard shortcuts)
-      4. Screen Reader (ARIA labels, roles, alt text, sr-only content)
-      ${framework?.name} component code:
-      \`\`\`${selectedFramework.value}
-      ${code.value}
-      \`\`\`
-      Respond with ONLY a JSON object (no markdown, no preamble) with this structure:
-      {
-        "issues": [
-          {
-            "category": "semantic" | "contrast" | "keyboard" | "screenReader",
-            "severity": "critical" | "warning" | "suggestion",
-            "title": "Brief issue title",
-            "description": "Detailed explanation",
-            "lineNumber": 5,
-            "fix": "How to fix it"
-          }
-        ],
-        "fixedCode": "Complete corrected ${framework?.name} component code"
-      }`,
-    })
+    const response = await fetch(`${backendUrl}/api/analyze-code`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: code.value, framework }),
+    });
 
-    // if (response.error) {
-    //   throw new Error(data.error.message || 'API error')
-    // }
-    const text = response.text
-    if (!text) throw new Error('No response from API')
-    // Clean up JSON response
-    let jsonText = text.trim()
-    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '')
-    const result = JSON.parse(jsonText)
+    const result = await response.json();
+    console.log(result)
     issues.value = result.issues || []
     fixedCode.value = result.fixedCode || ''
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Analysis error:', error)
+    errorMessage.value = error.response?.data?.error || 'Failed to analyze component. Please check your API key and try again.';
     issues.value = [
       {
         category: 'semantic',
         severity: 'critical',
         title: 'Analysis Error',
-        description:
-          error.message || 'Failed to analyze component. Please check your API key and try again.',
+        description: errorMessage.value || 'Failed to analyze component.',
         lineNumber: 0,
-        fix: 'Verify your Gemini API key is correct',
+        fix: 'Verify your Gemini API key is correct and session is active',
       },
     ]
+
+    if (error.response?.status === 401) {
+      sessionActive.value = false;
+      showApiInput.value = true;
+      errorMessage.value = errorMessage.value + " Please re-enter your API key to restart the session.";
+    }
   } finally {
     isAnalyzing.value = false
   }
 }
+
+// Function to simulate clearing the session. In a real scenario, you'd also have a backend endpoint to clear the HTTP-only cookie.
+async function clearLocalSession() {
+  sessionActive.value = false;
+  showApiInput.value = true;
+  apiKeyInput.value = '';
+  issues.value = [];
+  fixedCode.value = '';
+  errorMessage.value = "Session cleared. Please re-enter your API key.";
+  await fetch(`${backendUrl}/api/clear-session`, {
+    method: 'POST',
+    credentials: 'include'
+  })
+}
 </script>
 
 <template>
-  <div v-if="showApiInput && !apiKey" class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+  <div v-if="!sessionActive" class="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
     <p class="text-sm text-gray-700 mb-2">
       Get a free API key from
       <a
@@ -164,8 +206,18 @@ async function analyzeComponent() {
       type="password"
       placeholder="Paste your Gemini API key"
       class="w-full px-3 py-2 border border-gray-300 rounded-md"
-      v-model="apiKey"
+      v-model="apiKeyInput"
+      @keyup.enter="startSession"
     />
+    <button
+      @click="startSession"
+      :disabled="isAnalyzing || !apiKeyInput.trim()"
+      class="mt-3 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+    >
+      <span v-if="isAnalyzing">Establishing Session...</span>
+      <span v-else>Start New Session</span>
+    </button>
+    <p v-if="errorMessage" class="mt-3 text-red-600">{{ errorMessage }}</p>
   </div>
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Editor Section -->
@@ -195,14 +247,23 @@ async function analyzeComponent() {
           <span class="text-white text-sm font-medium">
             {{ languageMap.get(selectedFramework)?.name }} Component
           </span>
-          <button
-            @click="analyzeComponent"
-            :disabled="isAnalyzing"
-            class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <span v-if="isAnalyzing">⏳ Analyzing...</span>
-            <span v-else>Analyze Accessibility</span>
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              @click="analyzeComponent"
+              :disabled="isAnalyzing || !sessionActive"
+              class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <span v-if="isAnalyzing">⏳ Analyzing...</span>
+              <span v-else>Analyze Accessibility</span>
+            </button>
+            <button
+              v-if="sessionActive"
+              @click="clearLocalSession"
+              class="px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              <span>Clear Session</span>
+            </button>
+          </div>
         </div>
         <codemirror
           v-model="code"
@@ -250,6 +311,9 @@ async function analyzeComponent() {
           <div class="text-4xl mb-2">⏳</div>
           <p class="text-gray-600">Analyzing component...</p>
         </div>
+
+        <p v-if="errorMessage && !isAnalyzing" class="error-message text-red-600 text-center py-4">{{ errorMessage }}</p>
+
 
         <div class="space-y-3">
           <div
