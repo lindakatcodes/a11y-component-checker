@@ -127,6 +127,38 @@ async function startSession() {
   }
 }
 
+/**
+ * Sorts an array of accessibility issues in-place.
+ * 1. By line number (ascending, with 0 at the end).
+ * 2. By severity (critical, warning, suggestion).
+ * @param issuesToSort The array of Issue objects to sort.
+ */
+function sortIssues(issuesToSort: Issue[]): void {
+  // Define the order of severity for sorting
+  const severityOrder: { [key: string]: number } = {
+    critical: 1,
+    warning: 2,
+    suggestion: 3,
+  }
+
+  issuesToSort.sort((a, b) => {
+    // --- 1. Primary Sort: Line Number ---
+    const lineA = a.lineNumber
+    const lineB = b.lineNumber
+
+    // Rule: lineNumber 0 should always be at the end.
+    if (lineA === 0 && lineB !== 0) return 1
+    if (lineB === 0 && lineA !== 0) return -1
+
+    if (lineA !== lineB) return lineA - lineB
+
+    // --- 2. Secondary Sort: Severity (only if line numbers are the same) ---
+    const severityA = severityOrder[a.severity] || 99
+    const severityB = severityOrder[b.severity] || 99
+    return severityA - severityB
+  })
+}
+
 async function analyzeComponent() {
   errorMessage.value = null
   // the site should be set up so you can't use this function unless your session is already active, but it's smart to check and exit early just in case
@@ -154,7 +186,10 @@ async function analyzeComponent() {
     }
 
     const result = await response.json()
-    issues.value = result.issues || []
+
+    const receivedIssues = result.issues || []
+    sortIssues(receivedIssues)
+    issues.value = receivedIssues
     fixedCode.value = result.fixedCode || ''
   } catch (error: unknown) {
     console.error('Analysis error:', error)
@@ -244,7 +279,7 @@ async function clearLocalSession() {
             :class="[
               'flex-1 md:px-4 py-2 rounded-md text-sm font-medium transition-colors',
               selectedFramework === fw
-                ? 'bg-blue-600 text-white'
+                ? 'bg-sky-700 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
             ]"
             type="button"
@@ -264,7 +299,7 @@ async function clearLocalSession() {
             <button
               @click="analyzeComponent"
               :disabled="isAnalyzing || !sessionActive"
-              class="px-2 md:px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              class="px-2 md:px-4 py-2 bg-sky-700 text-white rounded-md text-sm font-medium hover:bg-sky-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               type="button"
             >
               <span v-if="isAnalyzing">⏳ Analyzing...</span>
@@ -335,8 +370,12 @@ async function clearLocalSession() {
         </p>
 
         <div class="space-y-3">
-          <IssueBlock v-for="(issue, idx) in issues"
-            :key="idx" :issue="issue" :categories="categories" />
+          <IssueBlock
+            v-for="(issue, idx) in issues"
+            :key="idx"
+            :issue="issue"
+            :categories="categories"
+          />
         </div>
       </div>
 
