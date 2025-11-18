@@ -5,24 +5,23 @@ import { angular } from '@codemirror/lang-angular'
 import { javascript } from '@codemirror/lang-javascript'
 import { vue } from '@codemirror/lang-vue'
 import type { Extension } from '@codemirror/state'
-import { computed, reactive, ref, onMounted } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { Codemirror } from 'vue-codemirror'
-import axios from 'axios' // Added axios
 
-const selectedFramework = ref('vue')
-const code = ref(EXAMPLES.vue)
-const issues = ref<Array<Issue>>([])
-const isAnalyzing = ref(false)
-const fixedCode = ref('')
-const copied = ref(false)
+const apiKeyInput = ref('')
 const showApiInput = ref(false)
-const apiKeyInput = ref('') // New ref for user's API key input
+const code = ref(EXAMPLES.vue)
+const copied = ref(false)
+const errorMessage = ref<string | null>(null)
+const fixedCode = ref('')
+const isAnalyzing = ref(false)
+const issues = ref<Array<Issue>>([])
+const selectedFramework = ref('vue')
 const sessionActive = ref(false)
-const errorMessage = ref<string | null>(null) // For displaying user-friendly errors
 
 const backendUrl = 'http://localhost:3001'
 
-// sets up a map of the possible languages available, with a string for quick access, a name and icon for UI viewing, and a mode and langFunc for codemirror to use
+// sets up a map of the possible languages available, with a string for quick access, a name and icon for UI viewing, and a mode and langFunc for codemirror
 const languageMap = reactive(
   new Map<string, { name: string; icon: string; mode: string; langFunc: () => unknown }>([
     ['vue', { name: 'Vue', icon: '💚', mode: 'vue', langFunc: vue }],
@@ -41,6 +40,20 @@ const categories = {
   contrast: { label: 'Color Contrast', icon: '🎨' },
   keyboard: { label: 'Keyboard Navigation', icon: '⌨️' },
   screenReader: { label: 'Screen Reader', icon: '👂' },
+}
+
+// Created an HttpError class and type guard to help with api call type safety
+class HttpError extends Error {
+  response: { status: number; data: { error?: string } }
+  constructor(message: string, status: number, data: { error?: string } = {}) {
+    super(message)
+    this.name = 'HttpError'
+    this.response = { status, data }
+  }
+}
+
+function isHttpError(error: unknown): error is HttpError {
+  return error instanceof HttpError
 }
 
 function selectFramework(frameworkId: string) {
@@ -81,57 +94,67 @@ function getSeverityClass(severity: string) {
 }
 
 async function checkSessionStatus() {
-  errorMessage.value = null;
+  errorMessage.value = null
   try {
     const response = await fetch(`${backendUrl}/api/check-session`, {
       credentials: 'include',
-    });
+    })
     // if this call succeeds, the session is active
     if (response.status === 200) {
-      sessionActive.value = true;
+      sessionActive.value = true
     }
   } catch (error: unknown) {
-    sessionActive.value = false;
-    showApiInput.value = true;
-    errorMessage.value = "Could not verify session. Please enter your API key.";
+    sessionActive.value = false
+    showApiInput.value = true
+    errorMessage.value = 'Could not verify session. Please enter your API key.'
   }
 }
 
 onMounted(() => {
-  checkSessionStatus();
-});
+  checkSessionStatus()
+})
 
 async function startSession() {
-  errorMessage.value = null;
-  isAnalyzing.value = true; // Use isAnalyzing to show loading state during session start
+  errorMessage.value = null
+  isAnalyzing.value = true
   try {
-    await fetch(`${backendUrl}/api/store-key`, {
+    const response = await fetch(`${backendUrl}/api/store-key`, {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey: apiKeyInput.value }),
-    });
+    })
 
-    sessionActive.value = true;
-    showApiInput.value = false;
-    apiKeyInput.value = '';
-    console.log('Session started successfully!');
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new HttpError('Failed to start session', response.status, errorData)
+    }
+
+    // No errors here means the key was stored successfully, so we make sure to remove the api key from the frontend and can hide the api key input field
+    sessionActive.value = true
+    showApiInput.value = false
+    apiKeyInput.value = ''
+    console.log('Session started successfully!')
   } catch (error: unknown) {
-    console.error('Error starting session:', error);
-    errorMessage.value = error.response?.data?.error || 'Failed to start session. Please check your API key and network.';
-    sessionActive.value = false;
-    showApiInput.value = true;
+    let message = 'Failed to start session. Please check your API key and network.'
+    if (isHttpError(error) && error.response.data.error) {
+      message = error.response.data.error
+    }
+    errorMessage.value = message
+    sessionActive.value = false
+    showApiInput.value = true
   } finally {
-    isAnalyzing.value = false;
+    isAnalyzing.value = false
   }
 }
 
 async function analyzeComponent() {
-  errorMessage.value = null;
+  errorMessage.value = null
+  // the site should be set up so you can't use this function unless your session is already active, but it's smart to check and exit early just in case
   if (!sessionActive.value) {
-    showApiInput.value = true;
-    errorMessage.value = "Please start a session with your API key first.";
-    return;
+    showApiInput.value = true
+    errorMessage.value = 'Please start a session with your API key first.'
+    return
   }
   isAnalyzing.value = true
   issues.value = []
@@ -144,47 +167,56 @@ async function analyzeComponent() {
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code: code.value, framework }),
-    });
+    })
 
-    const result = await response.json();
-    console.log(result)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      throw new HttpError('Analysis failed', response.status, errorData)
+    }
+
+    const result = await response.json()
     issues.value = result.issues || []
     fixedCode.value = result.fixedCode || ''
   } catch (error: unknown) {
     console.error('Analysis error:', error)
-    errorMessage.value = error.response?.data?.error || 'Failed to analyze component. Please check your API key and try again.';
+    let message = 'Failed to analyze component. Please check your API key and try again.'
+
+    if (isHttpError(error) && error.response.data.error) {
+      message = error.response.data.error
+    }
+
+    if (isHttpError(error) && error.response.status === 401) {
+      sessionActive.value = false
+      showApiInput.value = true
+      message += ' Please re-enter your API key to restart the session.'
+    }
+
+    errorMessage.value = message
     issues.value = [
       {
         category: 'semantic',
         severity: 'critical',
         title: 'Analysis Error',
-        description: errorMessage.value || 'Failed to analyze component.',
+        description: message || 'Failed to analyze component.',
         lineNumber: 0,
         fix: 'Verify your Gemini API key is correct and session is active',
       },
     ]
-
-    if (error.response?.status === 401) {
-      sessionActive.value = false;
-      showApiInput.value = true;
-      errorMessage.value = errorMessage.value + " Please re-enter your API key to restart the session.";
-    }
   } finally {
     isAnalyzing.value = false
   }
 }
 
-// Function to simulate clearing the session. In a real scenario, you'd also have a backend endpoint to clear the HTTP-only cookie.
 async function clearLocalSession() {
-  sessionActive.value = false;
-  showApiInput.value = true;
-  apiKeyInput.value = '';
-  issues.value = [];
-  fixedCode.value = '';
-  errorMessage.value = "Session cleared. Please re-enter your API key.";
+  sessionActive.value = false
+  showApiInput.value = true
+  apiKeyInput.value = ''
+  issues.value = []
+  fixedCode.value = ''
+  errorMessage.value = 'Session cleared. Please re-enter your API key.'
   await fetch(`${backendUrl}/api/clear-session`, {
     method: 'POST',
-    credentials: 'include'
+    credentials: 'include',
   })
 }
 </script>
@@ -219,39 +251,42 @@ async function clearLocalSession() {
     </button>
     <p v-if="errorMessage" class="mt-3 text-red-600">{{ errorMessage }}</p>
   </div>
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-    <!-- Editor Section -->
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Left column -->
     <div class="space-y-4">
       <!-- Framework Selector -->
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <label class="block text-sm font-medium text-gray-700 mb-3"> Select Framework </label>
+        <h2 class="block text-md font-medium text-gray-700 mb-3">Select Framework</h2>
         <div class="flex gap-2">
           <button
             v-for="fw in Array.from(languageMap.keys())"
             :key="fw"
             @click="selectFramework(fw)"
             :class="[
-              'flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+              'flex-1 md:px-4 py-2 rounded-md text-sm font-medium transition-colors',
               selectedFramework === fw
                 ? 'bg-blue-600 text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200',
             ]"
+            type="button"
           >
             {{ languageMap.get(fw)?.icon }} {{ languageMap.get(fw)?.name }}
           </button>
         </div>
       </div>
 
+      <!-- Code to analyze -->
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         <div class="p-3 bg-gray-800 flex justify-between items-center">
-          <span class="text-white text-sm font-medium">
+          <h3 class="text-white font-semibold basis-1/2">
             {{ languageMap.get(selectedFramework)?.name }} Component
-          </span>
+          </h3>
           <div class="flex items-center gap-2">
             <button
               @click="analyzeComponent"
               :disabled="isAnalyzing || !sessionActive"
-              class="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              class="px-2 md:px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              type="button"
             >
               <span v-if="isAnalyzing">⏳ Analyzing...</span>
               <span v-else>Analyze Accessibility</span>
@@ -259,7 +294,8 @@ async function clearLocalSession() {
             <button
               v-if="sessionActive"
               @click="clearLocalSession"
-              class="px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              class="px-2 md:px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              type="button"
             >
               <span>Clear Session</span>
             </button>
@@ -274,12 +310,14 @@ async function clearLocalSession() {
         />
       </div>
 
+      <!-- Fixed code view -->
       <div v-if="fixedCode" class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <div class="flex justify-between items-center mb-2">
           <h3 class="font-semibold text-gray-900">Fixed Code</h3>
           <button
             @click="copyFixedCode"
             class="px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 flex items-center gap-2"
+            type="button"
           >
             <span v-if="copied">✓ Copied!</span>
             <span v-else>📋 Copy Code</span>
@@ -295,8 +333,9 @@ async function clearLocalSession() {
       </div>
     </div>
 
-    <!-- Issues Section -->
+    <!-- Right column -->
     <div class="space-y-4">
+      <!-- Issues Section -->
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
         <h3 class="font-semibold text-gray-900 mb-4">
           Accessibility Issues <span v-if="issues.length > 0">({{ issues.length }})</span>
@@ -312,8 +351,9 @@ async function clearLocalSession() {
           <p class="text-gray-600">Analyzing component...</p>
         </div>
 
-        <p v-if="errorMessage && !isAnalyzing" class="error-message text-red-600 text-center py-4">{{ errorMessage }}</p>
-
+        <p v-if="errorMessage && !isAnalyzing" class="error-message text-red-600 text-center py-4">
+          {{ errorMessage }}
+        </p>
 
         <div class="space-y-3">
           <div
@@ -346,7 +386,7 @@ async function clearLocalSession() {
 
       <!-- Legend -->
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h4 class="font-semibold text-gray-900 mb-3 text-sm">Categories</h4>
+        <h3 class="font-semibold text-gray-900 mb-3 text-sm">Categories</h3>
         <div class="grid grid-cols-2 gap-2 text-sm">
           <div v-for="(val, key) in categories" :key="key" class="flex items-center gap-2">
             <span>{{ val.icon }}</span>
@@ -355,5 +395,5 @@ async function clearLocalSession() {
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </template>

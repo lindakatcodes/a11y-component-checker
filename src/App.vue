@@ -5,15 +5,14 @@ import CodeEditor from './components/CodeEditor.vue'
 useHead({
   title: 'A11y Component Checker',
   bodyAttrs: {
-    class: 'bg-gray-50',
+    class: 'bg-gray-50 m-4',
   },
 })
-
 </script>
 
 <template>
-  <header class="mb-8">
-    <h1 class="text-3xl font-bold text-gray-900 mb-2">Accessible Component Checker</h1>
+  <header class="mb-8 text-center">
+    <h1 class="text-4xl font-bold text-gray-900 mb-2">Accessible Component Checker</h1>
     <p class="text-gray-600">
       Paste your component code below to check for common accessibility issues
     </p>
@@ -21,7 +20,7 @@ useHead({
 
   <CodeEditor />
 
-  <footer class="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+  <footer class="mt-8">
     <div class="flex gap-3">
       <span class="text-2xl">⚠️</span>
       <div>
