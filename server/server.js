@@ -24,31 +24,6 @@ app.use(
 app.use(bodyParser.json())
 app.use(cookieParser())
 
-// Endpoint to store the API key and issue a session token
-app.post('/api/store-key', (req, res) => {
-  const { apiKey } = req.body
-  if (!apiKey) {
-    return res.status(400).json({ error: 'API key is required.' })
-  }
-
-  const sessionId = uuidv4()
-  const sessionToken = uuidv4()
-  const expiresAt = Date.now() + 24 * 60 * 60 * 1000 // 24 hours from now
-
-  apiKeysStore[sessionId] = { apiKey, expiresAt }
-  sessionTokenMap[sessionToken] = sessionId
-
-  res.cookie('session_token', sessionToken, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'Lax',
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
-  })
-
-  console.log(`API Key stored for session ${sessionId}. Token issued.`)
-  res.status(200).json({ message: 'Session established successfully.' })
-})
-
 // Middleware to authenticate requests using the session token
 function authenticateToken(req, res, next) {
   const sessionToken = req.cookies.session_token
@@ -77,6 +52,31 @@ function authenticateToken(req, res, next) {
   req.apiKey = sessionData.apiKey // Attach API key to request
   next()
 }
+
+// Endpoint to store the API key and issue a session token
+app.post('/api/store-key', (req, res) => {
+  const { apiKey } = req.body
+  if (!apiKey) {
+    return res.status(400).json({ error: 'API key is required.' })
+  }
+
+  const sessionId = uuidv4()
+  const sessionToken = uuidv4()
+  const expiresAt = Date.now() + 24 * 60 * 60 * 1000 // 24 hours from now
+
+  apiKeysStore[sessionId] = { apiKey, expiresAt }
+  sessionTokenMap[sessionToken] = sessionId
+
+  res.cookie('session_token', sessionToken, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'Lax',
+    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+  })
+
+  console.log(`API Key stored for session ${sessionId}. Token issued.`)
+  res.status(200).json({ message: 'Session established successfully.' })
+})
 
 // Endpoint to analyze code using the stored API key
 app.post('/api/analyze-code', authenticateToken, async (req, res) => {

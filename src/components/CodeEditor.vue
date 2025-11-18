@@ -252,6 +252,7 @@ async function clearLocalSession() {
       type="password"
       placeholder="Paste your Gemini API key"
       class="w-full px-3 py-2 border border-gray-300 rounded-md"
+      data-test="start-session-button"
       v-model="apiKeyInput"
       @keyup.enter="startSession"
     />
