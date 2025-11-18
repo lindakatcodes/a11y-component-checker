@@ -8,6 +8,25 @@ export interface Issue {
   fix: string
 }
 
+export interface Categories {
+  semantic: {
+    label: string
+    icon: string
+  }
+  contrast: {
+    label: string
+    icon: string
+  }
+  keyboard: {
+    label: string
+    icon: string
+  }
+  screenReader: {
+    label: string
+    icon: string
+  }
+}
+
 export interface AppInstance {
   apiKey: string
   code: string

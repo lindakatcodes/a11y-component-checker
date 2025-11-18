@@ -21,10 +21,10 @@ useHead({
   <CodeEditor />
 
   <footer class="mt-8">
-    <div class="flex gap-3">
+    <div class="flex gap-3 text-yellow-600 bg-yellow-50 border-yellow-200 border rounded-lg p-4">
       <span class="text-2xl">⚠️</span>
       <div>
-        <h4 class="font-semibold text-amber-900 mb-1">Important Reminder</h4>
+        <h4 class="font-semibold text-amber-900 mb-1 text-lg">Important Reminder</h4>
         <p class="text-sm text-amber-800">
           This tool provides AI-powered suggestions to help identify common accessibility issues.
           However, it should not be your only check. Always run additional tools like

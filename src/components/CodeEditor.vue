@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { EXAMPLES } from '@/assets/examples'
-import type { Issue } from '@/types'
+import type { Categories, Issue } from '@/types'
 import { angular } from '@codemirror/lang-angular'
 import { javascript } from '@codemirror/lang-javascript'
 import { vue } from '@codemirror/lang-vue'
 import type { Extension } from '@codemirror/state'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { Codemirror } from 'vue-codemirror'
+import IssueBlock from './IssueBlock.vue'
 
 const apiKeyInput = ref('')
 const showApiInput = ref(false)
@@ -35,7 +36,7 @@ const extensions = computed<Extension[]>(() => {
   return framework ? [framework.langFunc() as Extension] : []
 })
 
-const categories = {
+const categories: Categories = {
   semantic: { label: 'Semantic HTML', icon: '🏗️' },
   contrast: { label: 'Color Contrast', icon: '🎨' },
   keyboard: { label: 'Keyboard Navigation', icon: '⌨️' },
@@ -69,28 +70,6 @@ function copyFixedCode() {
   setTimeout(() => {
     copied.value = false
   }, 2000)
-}
-
-function getSeverityIcon(severity: string) {
-  switch (severity) {
-    case 'critical':
-      return '🔴'
-    case 'warning':
-      return '⚠️'
-    default:
-      return 'ℹ️'
-  }
-}
-
-function getSeverityClass(severity: string) {
-  switch (severity) {
-    case 'critical':
-      return 'text-red-600 bg-red-50 border-red-200'
-    case 'warning':
-      return 'text-yellow-600 bg-yellow-50 border-yellow-200'
-    default:
-      return 'text-blue-600 bg-blue-50 border-blue-200'
-  }
 }
 
 async function checkSessionStatus() {
@@ -244,12 +223,12 @@ async function clearLocalSession() {
     <button
       @click="startSession"
       :disabled="isAnalyzing || !apiKeyInput.trim()"
-      class="mt-3 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+      class="mt-3 px-4 py-2 bg-green-700 text-white rounded-md text-sm font-medium hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
     >
       <span v-if="isAnalyzing">Establishing Session...</span>
       <span v-else>Start New Session</span>
     </button>
-    <p v-if="errorMessage" class="mt-3 text-red-600">{{ errorMessage }}</p>
+    <p v-if="errorMessage" class="mt-3 text-red-700">{{ errorMessage }}</p>
   </div>
   <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <!-- Left column -->
@@ -316,7 +295,7 @@ async function clearLocalSession() {
           <h3 class="font-semibold text-gray-900">Fixed Code</h3>
           <button
             @click="copyFixedCode"
-            class="px-3 py-1.5 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 flex items-center gap-2"
+            class="px-3 py-1.5 bg-green-700 text-white rounded-md text-sm font-medium hover:bg-green-800 flex items-center gap-2"
             type="button"
           >
             <span v-if="copied">✓ Copied!</span>
@@ -351,42 +330,19 @@ async function clearLocalSession() {
           <p class="text-gray-600">Analyzing component...</p>
         </div>
 
-        <p v-if="errorMessage && !isAnalyzing" class="error-message text-red-600 text-center py-4">
+        <p v-if="errorMessage && !isAnalyzing" class="error-message text-red-700 text-center py-4">
           {{ errorMessage }}
         </p>
 
         <div class="space-y-3">
-          <div
-            v-for="(issue, idx) in issues"
-            :key="idx"
-            :class="['border rounded-lg p-4', getSeverityClass(issue.severity)]"
-          >
-            <div class="flex items-start gap-3">
-              <span class="text-xl">{{ getSeverityIcon(issue.severity) }}</span>
-              <div class="flex-1">
-                <div class="flex items-center gap-2 mb-1 flex-wrap">
-                  <span class="text-xs font-semibold uppercase">
-                    {{ issue.severity }}
-                  </span>
-                  <span class="text-xs">
-                    {{ categories[issue.category]?.icon }} {{ categories[issue.category]?.label }}
-                  </span>
-                  <span v-if="issue.lineNumber > 0" class="text-xs">
-                    Line {{ issue.lineNumber }}
-                  </span>
-                </div>
-                <h4 class="font-semibold mb-1">{{ issue.title }}</h4>
-                <p class="text-sm mb-2">{{ issue.description }}</p>
-                <div class="text-sm font-medium">💡 Fix: {{ issue.fix }}</div>
-              </div>
-            </div>
-          </div>
+          <IssueBlock v-for="(issue, idx) in issues"
+            :key="idx" :issue="issue" :categories="categories" />
         </div>
       </div>
 
       <!-- Legend -->
       <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-        <h3 class="font-semibold text-gray-900 mb-3 text-sm">Categories</h3>
+        <h3 class="font-semibold text-gray-900 mb-3">Categories</h3>
         <div class="grid grid-cols-2 gap-2 text-sm">
           <div v-for="(val, key) in categories" :key="key" class="flex items-center gap-2">
             <span>{{ val.icon }}</span>
