@@ -20,8 +20,6 @@ const issues = ref<Array<Issue>>([])
 const selectedFramework = ref('vue')
 const sessionActive = ref(false)
 
-const backendUrl = 'http://localhost:3001'
-
 // sets up a map of the possible languages available, with a string for quick access, a name and icon for UI viewing, and a mode and langFunc for codemirror
 const languageMap = reactive(
   new Map<string, { name: string; icon: string; mode: string; langFunc: () => unknown }>([
@@ -75,7 +73,7 @@ function copyFixedCode() {
 async function checkSessionStatus() {
   errorMessage.value = null
   try {
-    const response = await fetch(`${backendUrl}/api/check-session`, {
+    const response = await fetch("/.netlify/functions/check-session", {
       credentials: 'include',
     })
     // if this call succeeds, the session is active
@@ -97,7 +95,7 @@ async function startSession() {
   errorMessage.value = null
   isAnalyzing.value = true
   try {
-    const response = await fetch(`${backendUrl}/api/store-key`, {
+    const response = await fetch("/.netlify/functions/store-key", {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -173,7 +171,7 @@ async function analyzeComponent() {
 
   const framework = languageMap.get(selectedFramework.value)
   try {
-    const response = await fetch(`${backendUrl}/api/analyze-code`, {
+    const response = await fetch("/.netlify/functions/analyze-code", {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -228,7 +226,7 @@ async function clearLocalSession() {
   issues.value = []
   fixedCode.value = ''
   errorMessage.value = 'Session cleared. Please re-enter your API key.'
-  await fetch(`${backendUrl}/api/clear-session`, {
+  await fetch("/.netlify/functions/clear-session", {
     method: 'POST',
     credentials: 'include',
   })
