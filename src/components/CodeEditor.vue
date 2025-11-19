@@ -10,7 +10,6 @@ import { Codemirror } from 'vue-codemirror'
 import IssueBlock from './IssueBlock.vue'
 
 const apiKeyInput = ref('')
-const showApiInput = ref(false)
 const code = ref(EXAMPLES.vue)
 const copied = ref(false)
 const errorMessage = ref<string | null>(null)
@@ -73,7 +72,7 @@ function copyFixedCode() {
 async function checkSessionStatus() {
   errorMessage.value = null
   try {
-    const response = await fetch("/.netlify/functions/check-session", {
+    const response = await fetch('/.netlify/functions/check-session', {
       credentials: 'include',
     })
     // if this call succeeds, the session is active
@@ -82,7 +81,6 @@ async function checkSessionStatus() {
     }
   } catch (error: unknown) {
     sessionActive.value = false
-    showApiInput.value = true
     errorMessage.value = 'Could not verify session. Please enter your API key.'
   }
 }
@@ -95,7 +93,7 @@ async function startSession() {
   errorMessage.value = null
   isAnalyzing.value = true
   try {
-    const response = await fetch("/.netlify/functions/store-key", {
+    const response = await fetch('/.netlify/functions/store-key', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -109,7 +107,6 @@ async function startSession() {
 
     // No errors here means the key was stored successfully, so we make sure to remove the api key from the frontend and can hide the api key input field
     sessionActive.value = true
-    showApiInput.value = false
     apiKeyInput.value = ''
     console.log('Session started successfully!')
   } catch (error: unknown) {
@@ -119,7 +116,6 @@ async function startSession() {
     }
     errorMessage.value = message
     sessionActive.value = false
-    showApiInput.value = true
   } finally {
     isAnalyzing.value = false
   }
@@ -161,7 +157,6 @@ async function analyzeComponent() {
   errorMessage.value = null
   // the site should be set up so you can't use this function unless your session is already active, but it's smart to check and exit early just in case
   if (!sessionActive.value) {
-    showApiInput.value = true
     errorMessage.value = 'Please start a session with your API key first.'
     return
   }
@@ -171,7 +166,7 @@ async function analyzeComponent() {
 
   const framework = languageMap.get(selectedFramework.value)
   try {
-    const response = await fetch("/.netlify/functions/analyze-code", {
+    const response = await fetch('/.netlify/functions/analyze-code', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -199,7 +194,6 @@ async function analyzeComponent() {
 
     if (isHttpError(error) && error.response.status === 401) {
       sessionActive.value = false
-      showApiInput.value = true
       message += ' Please re-enter your API key to restart the session.'
     }
 
@@ -221,12 +215,11 @@ async function analyzeComponent() {
 
 async function clearLocalSession() {
   sessionActive.value = false
-  showApiInput.value = true
   apiKeyInput.value = ''
   issues.value = []
   fixedCode.value = ''
   errorMessage.value = 'Session cleared. Please re-enter your API key.'
-  await fetch("/.netlify/functions/clear-session", {
+  await fetch('/.netlify/functions/clear-session', {
     method: 'POST',
     credentials: 'include',
   })
@@ -250,12 +243,12 @@ async function clearLocalSession() {
       type="password"
       placeholder="Paste your Gemini API key"
       class="w-full px-3 py-2 border border-gray-300 rounded-md"
-      data-test="start-session-button"
       v-model="apiKeyInput"
       @keyup.enter="startSession"
     />
     <button
       @click="startSession"
+      data-test="start-session-button"
       :disabled="isAnalyzing || !apiKeyInput.trim()"
       class="mt-3 px-4 py-2 bg-green-700 text-white rounded-md text-sm font-medium hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
     >
@@ -307,6 +300,7 @@ async function clearLocalSession() {
             <button
               v-if="sessionActive"
               @click="clearLocalSession"
+              data-test="clear-session-button"
               class="px-2 md:px-4 py-2 bg-gray-600 text-white rounded-md text-sm font-medium hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               type="button"
             >
