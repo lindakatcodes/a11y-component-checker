@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { handler } from '../functions/clear-session.js'
+import { handler } from '../functions/clear-session'
 
 describe('clear-session handler', () => {
   test('should return 200 and an expired cookie on success', async () => {

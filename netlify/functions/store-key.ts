@@ -1,12 +1,13 @@
-import { encrypt } from '../utils/auth.js'
+import { encrypt } from '../utils/auth'
 import cookie from 'cookie'
+import type { Handler } from '@netlify/functions'
 
-export async function handler(event) {
+export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
-  const { apiKey } = JSON.parse(event.body)
+  const { apiKey } = JSON.parse(event.body || '{}')
 
   if (!apiKey) {
     return { statusCode: 400, body: JSON.stringify({ error: 'API key is required.' }) }

@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
-import { handler } from '../functions/store-key.js'
-import { encrypt } from '../utils/auth.js'
+import { handler } from '../functions/store-key'
+import { encrypt } from '../utils/auth'
 
 // Mock the auth utility
-vi.mock('../utils/auth.js')
+vi.mock('../utils/auth')
 
 describe('store-key handler', () => {
   beforeEach(() => {

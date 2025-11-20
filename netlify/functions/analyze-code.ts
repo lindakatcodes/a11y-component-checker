@@ -1,10 +1,11 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import cookie from 'cookie'
-import { decrypt } from '../utils/auth.js'
+import { decrypt } from '../utils/auth'
+import type { Handler, HandlerEvent } from '@netlify/functions'
 
 // Helper function to get API key from cookie
-const getApiKeyFromCookie = (event) => {
-  if (!event.headers.cookie) {
+const getApiKeyFromCookie = (event: HandlerEvent): string | null => {
+  if (!event.headers?.cookie) {
     return null
   }
   const cookies = cookie.parse(event.headers.cookie)
@@ -20,7 +21,7 @@ const getApiKeyFromCookie = (event) => {
   }
 }
 
-export async function handler(event) {
+export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' }
   }
@@ -36,7 +37,7 @@ export async function handler(event) {
     }
   }
 
-  const { code, framework } = JSON.parse(event.body)
+  const { code, framework } = JSON.parse(event.body || '{}')
 
   if (!code || !framework) {
     return {
@@ -92,7 +93,7 @@ export async function handler(event) {
       statusCode: 500,
       body: JSON.stringify({
         error: 'Failed to get analysis from AI service.',
-        details: error.message,
+        details: (error as Error).message,
       }),
     }
   }

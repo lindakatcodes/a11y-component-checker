@@ -17,7 +17,7 @@ describe('auth utility', () => {
   })
 
   test('should encrypt and then decrypt data back to the original', async () => {
-    const { encrypt, decrypt } = await import('../utils/auth.js')
+    const { encrypt, decrypt } = await import('../utils/auth')
     const encrypted = encrypt(testData)
     expect(encrypted).not.toBe(testData)
     expect(encrypted.includes(':')).toBe(true)
@@ -29,12 +29,12 @@ describe('auth utility', () => {
   test('encrypt should throw an error if ENCRYPTION_KEY is not set', async () => {
     delete process.env.ENCRYPTION_KEY
     vi.resetModules() // Reset modules to force re-import
-    const { encrypt } = await import('../utils/auth.js')
+    const { encrypt } = await import('../utils/auth')
     expect(() => encrypt(testData)).toThrow('ENCRYPTION_KEY environment variable is not set.')
   })
 
   test('decrypt should throw an error if ENCRYPTION_KEY is not set', async () => {
-    const { encrypt, decrypt } = await import('../utils/auth.js')
+    const { encrypt, decrypt } = await import('../utils/auth')
     const encrypted = encrypt(testData)
     delete process.env.ENCRYPTION_KEY
     vi.resetModules() // Reset modules to force re-import

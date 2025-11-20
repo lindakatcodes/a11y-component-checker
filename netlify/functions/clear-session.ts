@@ -1,8 +1,9 @@
-import cookie from 'cookie';
+import cookie from 'cookie'
+import type { Handler } from '@netlify/functions'
 
-export async function handler(event) {
+export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { statusCode: 405, body: 'Method Not Allowed' }
   }
 
   const sessionCookie = cookie.serialize('session_token', '', {
@@ -11,7 +12,7 @@ export async function handler(event) {
     sameSite: 'Lax',
     expires: new Date(0), // Expire the cookie immediately
     path: '/',
-  });
+  })
 
   return {
     statusCode: 200,
@@ -20,5 +21,5 @@ export async function handler(event) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ message: 'Session cleared successfully.' }),
-  };
-};
+  }
+}

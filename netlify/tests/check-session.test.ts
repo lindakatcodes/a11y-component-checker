@@ -1,9 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest'
-import { handler } from '../functions/check-session.js'
-import { decrypt } from '../utils/auth.js'
+import { handler } from '../functions/check-session'
+import { decrypt } from '../utils/auth'
 
 // Mock the auth utility
-vi.mock('../utils/auth.js')
+vi.mock('../utils/auth')
 
 describe('check-session handler', () => {
   beforeEach(() => {

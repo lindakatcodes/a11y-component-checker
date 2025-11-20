@@ -2,7 +2,7 @@ import crypto from 'crypto'
 
 const IV_LENGTH = 16 // For AES-256-CBC
 
-const encrypt = (text) => {
+const encrypt = (text: string): string => {
   const key = process.env.ENCRYPTION_KEY
   if (!key) {
     throw new Error('ENCRYPTION_KEY environment variable is not set.')
@@ -21,7 +21,7 @@ const encrypt = (text) => {
   return iv.toString('hex') + ':' + encrypted.toString('hex')
 }
 
-const decrypt = (text) => {
+const decrypt = (text: string): string => {
   const key = process.env.ENCRYPTION_KEY
   if (!key) {
     throw new Error('ENCRYPTION_KEY environment variable is not set.')
