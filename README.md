@@ -1,54 +1,113 @@
-# a11y-component-checker
+# A11y Component Checker
 
-This template should help get you started developing with Vue 3 in Vite.
+An AI-powered accessibility checker that uses Google's Gemini API to analyze component code for common accessibility errors and provide instructive, actionable corrections.
 
-## Recommended IDE Setup
+View the live app at https://a11y-component-checker.netlify.app/
 
-[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+## What It Does
 
-## Recommended Browser Setup
+This tool helps developers improve the accessibility of their web components by:
+- Analyzing component code for WCAG compliance issues
+- Identifying common a11y anti-patterns
+- Providing clear, educational explanations of accessibility problems
+- Offering specific code corrections and best practices
+- Provides starter examples and can analyze code for Vue, React, and Angular components
 
-- Chromium-based browsers (Chrome, Edge, Brave, etc.):
-  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd) 
-  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
-- Firefox:
-  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
-  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+Unlike static linters, this tool leverages Gemini's language understanding to provide contextual, human-readable feedback that helps you learn accessibility principles while fixing issues.
 
-## Type Support for `.vue` Imports in TS
+## Tech Stack
 
-TypeScript cannot handle type information for `.vue` imports by default, so we replace the `tsc` CLI with `vue-tsc` for type checking. In editors, we need [Volar](https://marketplace.visualstudio.com/items?itemName=Vue.volar) to make the TypeScript language service aware of `.vue` types.
+- **Vue 3** - Progressive JavaScript framework
+- **Vite** - Next-generation frontend build tool
+- **TypeScript** - Type-safe JavaScript
+- **Vitest** - Unit testing framework
+- **ESLint** - Code linting
+- **Google Gemini API** - AI-powered code analysis
 
-## Customize configuration
+## Prerequisites
 
-See [Vite Configuration Reference](https://vite.dev/config/).
+- Node.js (v20 or higher recommended)
+- npm or your preferred package manager
+- A Google Gemini API key ([Get one from Google's AI Studio](https://aistudio.google.com/app/apikey))
 
-## Project Setup
+## Getting Started Locally
 
-```sh
+### Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/lindakatcodes/a11y-component-checker.git
+cd a11y-component-checker
+
+# Install dependencies
 npm install
 ```
 
-### Compile and Hot-Reload for Development
+### Configuration
+
+The only environment variable is an encryption key that the serverless function will use to encrypt a user's Gemini API key. You can generate this on a Windows Subsystem for Linux terminal with the below command, or using a site like https://generate-random.org/encryption-keys to create a random string of hexadecimal characters the right length. 
 
 ```sh
+openssl rand -base64 32
+```
+
+Then store that generated key in your `.env` file. 
+
+```env
+ENCRYPTION_KEY=your_generated_key
+```
+
+## Available Commands
+
+### Development
+
+Start the frontend development server with hot-reload:
+
+```bash
 npm run dev
 ```
 
-### Type-Check, Compile and Minify for Production
+The app will be available at `http://localhost:5173` (or another port if 5173 is busy).
 
-```sh
+The serverless endpoint functions for this site make use of Netlify's functions, so to run a version of the site locally that can actually use those endpoints, you'll want to have the [Netlify CLI](https://docs.netlify.com/api-and-cli-guides/cli-guides/get-started-with-cli/) and run the following command: 
+
+```bash
+netlify dev
+```
+
+That will setup a local environment to simulate the production environment, giving you access to the serverless functions.
+
+### Build
+
+Create a production-ready build:
+
+```bash
 npm run build
 ```
 
-### Run Unit Tests with [Vitest](https://vitest.dev/)
+The optimized files will be output to the `dist/` directory.
 
-```sh
+### Testing
+
+Run unit tests with Vitest:
+
+```bash
 npm run test:unit
 ```
 
-### Lint with [ESLint](https://eslint.org/)
+### Linting
 
-```sh
+Check and fix code style issues:
+
+```bash
 npm run lint
 ```
+
+## Acknowledgments
+
+Powered by Google's Gemini API for intelligent accessibility analysis.
+A large portion of this application was generated with help from [Goose](https://block.github.io/goose/docs/quickstart) and [Gemini Code Assist for VSCode](https://marketplace.visualstudio.com/items?itemName=Google.geminicodeassist). If you notice any issues or have suggestions for improvements, please create an issue and let me know!
+
+---
+
+**Note**: This tool is designed to supplement, not replace, manual accessibility testing and human judgment. Always test your applications with real assistive technologies and diverse users.
