@@ -1,5 +1,5 @@
 // src/tests/CodeEditor.spec.ts
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import type { Issue } from '@/types'
 import CodeEditor from '../components/CodeEditor.vue'
@@ -47,6 +47,10 @@ describe('CodeEditor Component', () => {
     // Clear all previous mocks
     vi.unstubAllGlobals()
     wrapper = mount(CodeEditor)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   describe('Session Management', () => {
@@ -244,6 +248,8 @@ describe('CodeEditor Component', () => {
     })
 
     it('should handle backend error responses gracefully (e.g., 500)', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
       const mockErrorIssue = [
         {
           category: 'semantic',
@@ -286,6 +292,7 @@ describe('CodeEditor Component', () => {
       expect(wrapper.vm.errorMessage).toBe(
         'Failed to analyze component. Please check your API key and try again.',
       )
+      expect(consoleSpy).toHaveBeenCalled()
     })
 
     it('should not be able to trigger an analysis if no session is active', async () => {

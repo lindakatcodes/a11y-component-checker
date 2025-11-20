@@ -1,6 +1,5 @@
 import crypto from 'crypto'
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY // Must be 32 bytes (256 bits)
 const IV_LENGTH = 16 // For AES-256-CBC
 
 const encrypt = (text) => {
@@ -23,13 +22,14 @@ const encrypt = (text) => {
 }
 
 const decrypt = (text) => {
-  if (!ENCRYPTION_KEY) {
+  const key = process.env.ENCRYPTION_KEY
+  if (!key) {
     throw new Error('ENCRYPTION_KEY environment variable is not set.')
   }
   // Use a sha256 hash of the key to ensure it is 32 bytes
   const hashedKey = crypto
     .createHash('sha256')
-    .update(String(ENCRYPTION_KEY))
+    .update(String(key))
     .digest('base64')
     .substring(0, 32)
 
